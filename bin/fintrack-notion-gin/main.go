@@ -11,7 +11,7 @@ import (
 )
 
 func isAuth(authToken string, c *gin.Context) bool {
-	return authToken == c.Request.Header["Token"][0]
+	return authToken == c.Request.Header["token"][0]
 }
 
 func main() {
