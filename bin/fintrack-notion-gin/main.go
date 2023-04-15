@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	storage "github.com/guidiego/fintrack.api/packages/storage/notion"
@@ -109,6 +112,81 @@ func main() {
 
 		if err != nil {
 			panic(err)
+		}
+
+		c.IndentedJSON(http.StatusCreated, gin.H{"ok": true})
+	})
+
+	r.GET("/to-schedule", func(c *gin.Context) {
+		if !isAuth(authToken, c) {
+			return
+		}
+
+		now := time.Now()
+		todayStr := now.Format("02")
+		today, _ := strconv.Atoi(todayStr)
+
+		schedules, err := s.ListToSchedule(&ports.ToScheduleFilterInput{
+			FromDay: &today,
+		})
+
+		if err != nil {
+			log.Fatalln(err)
+			return
+		}
+
+		c.IndentedJSON(http.StatusCreated, schedules)
+	})
+
+	r.POST("/automation/schedule", func(c *gin.Context) {
+		if !isAuth(authToken, c) {
+			return
+		}
+
+		now := time.Now()
+		todayStr := now.Format("02")
+		today, _ := strconv.Atoi(todayStr)
+		lastDayTime := now.AddDate(0, 1, -today)
+
+		onlyAutoDebit := true
+		schedules, err := s.ListToSchedule(&ports.ToScheduleFilterInput{
+			AutoDebit: &onlyAutoDebit,
+			FromDay:   &today,
+		})
+
+		if err != nil {
+			return
+		}
+
+		lastDay, err := strconv.ParseFloat(lastDayTime.Format("02"), 0)
+		if err != nil {
+			return
+		}
+
+		for _, schedule := range schedules {
+			scheduledDay := schedule.Day
+
+			if scheduledDay < 0 {
+				scheduledDay = lastDay + scheduledDay
+			}
+
+			if scheduledDay == float64(today) {
+				t := ports.Transaction{
+					Value:       schedule.Value,
+					Description: &schedule.Ref,
+					AccountID:   &schedule.AccountID,
+				}
+
+				if schedule.BudgetID != nil {
+					t.BudgetID = schedule.BudgetID
+				}
+
+				_, err := s.SaveTransaction(t)
+
+				if err != nil {
+					fmt.Printf("%e", err)
+				}
+			}
 		}
 
 		c.IndentedJSON(http.StatusCreated, gin.H{"ok": true})

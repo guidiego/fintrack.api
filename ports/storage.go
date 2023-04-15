@@ -18,21 +18,26 @@ type Budget struct {
 }
 
 type ToSchedule struct {
-	Ref       string
-	Day       float64
+	Ref       string  `json:"ref"`
+	Day       float64 `json:"day"`
 	AccountID string
-	Value     float64
-	BudgetID  string
-	AutoDebit bool
+	Value     float64 `json:"value"`
+	BudgetID  *string
+	AutoDebit bool `json:"autoDebit"`
 }
 
 type Goal struct {
+}
+
+type ToScheduleFilterInput struct {
+	AutoDebit *bool
+	FromDay   *int
 }
 
 type Storage interface {
 	SaveTransaction(Transaction) (Transaction, error)
 	ListAccounts() ([]Account, error)
 	ListBudgets(*Budget) ([]Budget, error)
-	ListToSchedule() ([]ToSchedule, error)
+	ListToSchedule(filter *ToScheduleFilterInput) ([]ToSchedule, error)
 	// ListGoals(*Goal) ([]Goal, error)
 }
