@@ -33,13 +33,17 @@ func main() {
 			return
 		}
 
-		budgets, err := s.ListBudgets(&ports.Budget{MonthKey: "202304"})
+		monthKey := c.Query("year") + c.Query("month")
+		exactVal := c.Query("exact") != ""
+		budgets, err := s.ListBudgets(&ports.BudgetFilterInput{
+			MonthKey:    &monthKey,
+			ExactValues: &exactVal,
+		})
 
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Printf("%+v", budgets)
 		c.IndentedJSON(http.StatusOK, budgets)
 	})
 

@@ -2,35 +2,25 @@ package storagenotion
 
 import (
 	"context"
+	"sync"
 
 	"github.com/dstotijn/go-notion"
 	"github.com/guidiego/fintrack.api/ports"
 )
 
-func formatFilter(b ports.Budget) *notion.DatabaseQueryFilter {
-	filter := notion.DatabaseQueryFilter{
-		And: []notion.DatabaseQueryFilter{},
-	}
+func (s *NotionStorage) ListBudgets(ipt *ports.BudgetFilterInput) ([]ports.Budget, error) {
+	var wg sync.WaitGroup
+	query := notion.DatabaseQuery{}
 
-	if b.MonthKey != "" {
-		filter.And = append(filter.And, notion.DatabaseQueryFilter{
+	if ipt.MonthKey != nil {
+		query.Filter = &notion.DatabaseQueryFilter{
 			Property: "MonthKey",
 			DatabaseQueryPropertyFilter: notion.DatabaseQueryPropertyFilter{
 				RichText: &notion.TextPropertyFilter{
-					Equals: b.MonthKey,
+					Equals: *ipt.MonthKey,
 				},
 			},
-		})
-	}
-
-	return &filter
-}
-
-func (s *NotionStorage) ListBudgets(b *ports.Budget) ([]ports.Budget, error) {
-	query := notion.DatabaseQuery{}
-
-	if b != nil {
-		query.Filter = formatFilter(*b)
+		}
 	}
 
 	dbItems, cliError := s.cli.QueryDatabase(context.Background(), s.table.BudgetID, &query)
@@ -39,17 +29,44 @@ func (s *NotionStorage) ListBudgets(b *ports.Budget) ([]ports.Budget, error) {
 		return []ports.Budget{}, cliError
 	}
 
-	budgets := make([]ports.Budget, len(dbItems.Results))
-	for i, r := range dbItems.Results {
+	budgets := make([]ports.Budget, 0)
+	wg.Add(len(dbItems.Results))
+	for _, r := range dbItems.Results {
 		props := r.Properties.(notion.DatabasePageProperties)
-		budgets[i] = ports.Budget{
-			ID:     r.ID,
-			Budget: props["Budget"].Title[0].PlainText,
-			Limit:  *props["Limit"].Number,
-			Used:   *props["Used"].Rollup.Number,
-			Free:   *props["Free"].Formula.Number,
-		}
+
+		go func() {
+			defer wg.Done()
+			prop := props["Used"]
+
+			budget := ports.Budget{
+				ID:       r.ID,
+				Budget:   props["Budget"].Title[0].PlainText,
+				Limit:    *props["Limit"].Number,
+				Used:     *prop.Rollup.Number,
+				Free:     *props["Free"].Formula.Number,
+				MonthKey: *ipt.MonthKey,
+			}
+
+			var err error
+			if *ipt.ExactValues {
+				field, err := s.cli.FindPagePropertyByID(context.Background(), r.ID, prop.ID, nil)
+
+				if err == nil {
+					budget.Used = *field.PropertyItem.Rollup.Number
+				}
+			}
+
+			if err != nil {
+				budget.Free = budget.Limit + budget.Used
+			} else {
+				budget.Used = *prop.Rollup.Number
+				budget.Free = *props["Free"].Formula.Number
+			}
+
+			budgets = append(budgets, budget)
+		}()
 	}
 
+	wg.Wait()
 	return budgets, nil
 }
