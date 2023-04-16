@@ -47,20 +47,13 @@ func (s *NotionStorage) ListBudgets(ipt *ports.BudgetFilterInput) ([]ports.Budge
 				MonthKey: *ipt.MonthKey,
 			}
 
-			var err error
 			if *ipt.ExactValues {
 				field, err := s.cli.FindPagePropertyByID(context.Background(), r.ID, prop.ID, nil)
 
-				if err == nil {
+				if err != nil {
 					budget.Used = *field.PropertyItem.Rollup.Number
+					budget.Free = budget.Limit + budget.Used
 				}
-			}
-
-			if err != nil {
-				budget.Free = budget.Limit + budget.Used
-			} else {
-				budget.Used = *prop.Rollup.Number
-				budget.Free = *props["Free"].Formula.Number
 			}
 
 			budgets = append(budgets, budget)
