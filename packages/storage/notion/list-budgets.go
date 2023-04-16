@@ -8,13 +8,19 @@ import (
 )
 
 func formatFilter(b ports.Budget) *notion.DatabaseQueryFilter {
-	filter := notion.DatabaseQueryFilter{}
+	filter := notion.DatabaseQueryFilter{
+		And: []notion.DatabaseQueryFilter{},
+	}
 
 	if b.MonthKey != "" {
-		filter.Property = "MonthKey"
-		filter.RichText = &notion.TextPropertyFilter{
-			Equals: b.MonthKey,
-		}
+		filter.And = append(filter.And, notion.DatabaseQueryFilter{
+			Property: "MonthKey",
+			DatabaseQueryPropertyFilter: notion.DatabaseQueryPropertyFilter{
+				RichText: &notion.TextPropertyFilter{
+					Equals: b.MonthKey,
+				},
+			},
+		})
 	}
 
 	return &filter

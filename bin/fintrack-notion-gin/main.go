@@ -36,9 +36,10 @@ func main() {
 		budgets, err := s.ListBudgets(&ports.Budget{MonthKey: "202304"})
 
 		if err != nil {
-			return
+			panic(err)
 		}
 
+		fmt.Printf("%+v", budgets)
 		c.IndentedJSON(http.StatusOK, budgets)
 	})
 
