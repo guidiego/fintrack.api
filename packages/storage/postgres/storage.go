@@ -160,6 +160,7 @@ func (p *PostgresStorage) ListTransactions(accountID string) ([]ports.Transactio
 		INNER JOIN budget as b ON b.id = t.budget_id
 		INNER JOIN recipient as r ON r.id = t.recipient_id
 		WHERE t.account_id = $1
+		ORDER BY t.created_at DESC
 		LIMIT 10
 	`
 
