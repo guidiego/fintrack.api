@@ -55,7 +55,7 @@ func (p *PostgresStorage) SaveTransaction(t ports.Transaction) error {
 	INSERT INTO public.transaction("value", "description", "budget_id", "recipient_id", "goal_id", "account_id")
 	VALUES($1, $2, $3, $4, $5, $6)`
 
-	_, err := p.cli.Exec(q, t.Value, t.Description, t.BudgetID, t.RecipientID, t.GoalID, t.AccountID)
+	_, err := p.cli.Exec(q, t.Value, t.Description, t.BudgetID, t.RecipientID, t.GoalID, "123")
 
 	return err
 }
