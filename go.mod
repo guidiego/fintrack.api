@@ -6,6 +6,7 @@ require (
 	github.com/dstotijn/go-notion v0.11.0
 	github.com/gin-gonic/gin v1.9.0
 	github.com/google/uuid v1.3.0
+	github.com/lib/pq v1.10.8
 )
 
 require (

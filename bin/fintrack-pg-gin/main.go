@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	storage "github.com/guidiego/fintrack.api/packages/storage/notion"
+	storage "github.com/guidiego/fintrack.api/packages/storage/postgres"
 	"github.com/guidiego/fintrack.api/ports"
 )
 
@@ -33,11 +33,13 @@ func main() {
 			return
 		}
 
-		monthKey := c.Query("year") + c.Query("month")
-		exactVal := c.Query("exact") != ""
-		budgets, err := s.ListBudgets(&ports.BudgetFilterInput{
-			MonthKey:    &monthKey,
-			ExactValues: &exactVal,
+		year, _ := strconv.ParseInt(c.Query("year"), 10, 64)
+		month, _ := strconv.ParseInt(c.Query("month"), 10, 64)
+
+		budgets, err := s.ListBudgets(ports.BudgetFilterInput{
+			AccountID: "123",
+			Month:     int32(month),
+			Year:      int32(year),
 		})
 
 		if err != nil {
@@ -47,18 +49,32 @@ func main() {
 		c.IndentedJSON(http.StatusOK, budgets)
 	})
 
-	r.GET("/account", func(c *gin.Context) {
+	r.GET("/recipient", func(c *gin.Context) {
 		if !isAuth(authToken, c) {
 			return
 		}
 
-		accounts, err := s.ListAccounts()
+		recipients, err := s.ListRecipients("123")
 
 		if err != nil {
 			return
 		}
 
-		c.IndentedJSON(http.StatusOK, accounts)
+		c.IndentedJSON(http.StatusOK, recipients)
+	})
+
+	r.GET("/transaction", func(c *gin.Context) {
+		if !isAuth(authToken, c) {
+			return
+		}
+
+		transactions, err := s.ListTransactions("123")
+
+		if err != nil {
+			panic(err)
+		}
+
+		c.IndentedJSON(http.StatusCreated, transactions)
 	})
 
 	r.POST("/transaction", func(c *gin.Context) {
@@ -73,8 +89,7 @@ func main() {
 			panic(err)
 		}
 
-		transaction, err = s.SaveTransaction(transaction)
-
+		err = s.SaveTransaction(transaction)
 		if err != nil {
 			panic(err)
 		}
@@ -96,25 +111,23 @@ func main() {
 
 		desc := fmt.Sprintf("🔄 Money Transfer")
 		rmTransaction := ports.Transaction{
-			AccountID:   &transfer.FromAccountId,
+			RecipientID: &transfer.FromRecipientID,
 			Description: &desc,
 			Value:       -transfer.Value,
 		}
 
 		addTransaction := ports.Transaction{
-			AccountID:   &transfer.ToAccountId,
+			RecipientID: &transfer.ToRecipientID,
 			Description: &desc,
 			Value:       transfer.Value,
 		}
 
-		_, err = s.SaveTransaction(rmTransaction)
-
+		err = s.SaveTransaction(rmTransaction)
 		if err != nil {
 			panic(err)
 		}
 
-		_, err = s.SaveTransaction(addTransaction)
-
+		err = s.SaveTransaction(addTransaction)
 		if err != nil {
 			panic(err)
 		}
@@ -122,7 +135,7 @@ func main() {
 		c.IndentedJSON(http.StatusCreated, gin.H{"ok": true})
 	})
 
-	r.GET("/to-schedule", func(c *gin.Context) {
+	r.GET("/upcomming", func(c *gin.Context) {
 		if !isAuth(authToken, c) {
 			return
 		}
@@ -130,17 +143,18 @@ func main() {
 		now := time.Now()
 		todayStr := now.Format("02")
 		today, _ := strconv.Atoi(todayStr)
-
-		schedules, err := s.ListToSchedule(&ports.ToScheduleFilterInput{
-			FromDay: &today,
-		})
+		schedules, err := s.ListUpComming("123", today)
+		lastDayTime := now.AddDate(0, 1, -int(today))
 
 		if err != nil {
 			log.Fatalln(err)
 			return
 		}
 
-		c.IndentedJSON(http.StatusCreated, schedules)
+		c.IndentedJSON(http.StatusCreated, gin.H{
+			"lastDay":   lastDayTime,
+			"upcomming": schedules,
+		})
 	})
 
 	r.POST("/automation/schedule", func(c *gin.Context) {
@@ -150,20 +164,16 @@ func main() {
 
 		now := time.Now()
 		todayStr := now.Format("02")
-		today, _ := strconv.Atoi(todayStr)
-		lastDayTime := now.AddDate(0, 1, -today)
+		today, _ := strconv.ParseInt(todayStr, 10, 64)
+		lastDayTime := now.AddDate(0, 1, -int(today))
 
-		onlyAutoDebit := true
-		schedules, err := s.ListToSchedule(&ports.ToScheduleFilterInput{
-			AutoDebit: &onlyAutoDebit,
-			FromDay:   &today,
-		})
+		schedules, err := s.ListUpComming("123", -int(today))
 
 		if err != nil {
 			return
 		}
 
-		lastDay, err := strconv.ParseFloat(lastDayTime.Format("02"), 0)
+		lastDay, err := strconv.ParseInt(lastDayTime.Format("02"), 10, 64)
 		if err != nil {
 			return
 		}
@@ -175,19 +185,20 @@ func main() {
 				scheduledDay = lastDay + scheduledDay
 			}
 
-			if scheduledDay == float64(today) {
+			if scheduledDay == today {
 				t := ports.Transaction{
 					Value:       schedule.Value,
-					Description: &schedule.Ref,
-					AccountID:   &schedule.AccountID,
+					Description: &schedule.Name,
+					AccountID:   schedule.AccountID,
+					RecipientID: schedule.RecipientID,
+					BudgetID:    schedule.BudgetID,
 				}
 
 				if schedule.BudgetID != nil {
 					t.BudgetID = schedule.BudgetID
 				}
 
-				_, err := s.SaveTransaction(t)
-
+				err := s.SaveTransaction(t)
 				if err != nil {
 					fmt.Printf("%e", err)
 				}

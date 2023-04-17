@@ -1,7 +1,7 @@
 package ports
 
 type Transfer struct {
-	FromAccountId string  `json:"fromAccountId"`
-	ToAccountId   string  `json:"toAccountId"`
-	Value         float64 `json:"value"`
+	FromRecipientID string  `json:"fromRecipientId"`
+	ToRecipientID   string  `json:"toRecipientId"`
+	Value           float64 `json:"value"`
 }
