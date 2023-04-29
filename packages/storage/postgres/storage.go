@@ -193,3 +193,46 @@ func (p *PostgresStorage) ListTransactions(accountID string) ([]ports.Transactio
 
 	return transactions, nil
 }
+
+func (p *PostgresStorage) ListGoal(accountID string, status *int) ([]ports.Goal, error) {
+	statusFormatted := 2
+
+	if status != nil {
+		statusFormatted = *status
+	}
+
+	q := `
+		SELECT g.*, sum(t.value) as used FROM goal as g
+		LEFT JOIN transaction as t on t.goal_id = g.id
+		WHERE g.account_id = $1 AND g.status < $2
+		group by g.id
+	`
+
+	res, err := p.cli.Query(q, accountID, statusFormatted)
+
+	if err != nil {
+		return []ports.Goal{}, err
+	}
+
+	goals := []ports.Goal{}
+	for res.Next() {
+		g := ports.Goal{
+			AccountID: "123",
+		}
+
+		res.Scan(
+			&g.ID,
+			&g.Name,
+			&g.Desired,
+			&g.Status,
+			&g.AccountID,
+			&g.RecipientId,
+			&g.Allocated,
+			&g.Used,
+		)
+
+		goals = append(goals, g)
+	}
+
+	return goals, nil
+}

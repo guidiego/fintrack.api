@@ -135,26 +135,45 @@ func main() {
 		c.IndentedJSON(http.StatusCreated, gin.H{"ok": true})
 	})
 
+	r.GET("/check-health", func(c *gin.Context) {
+		c.IndentedJSON(http.StatusOK, gin.H{"ok": true})
+	})
+
 	r.GET("/upcomming", func(c *gin.Context) {
 		if !isAuth(authToken, c) {
 			return
 		}
 
-		now := time.Now()
-		todayStr := now.Format("02")
+		todayStr := c.Query("day")
+		if todayStr == "" {
+			now := time.Now()
+			todayStr = now.Format("02")
+		}
+
 		today, _ := strconv.Atoi(todayStr)
-		schedules, err := s.ListUpComming("123", today)
-		lastDayTime := now.AddDate(0, 1, -int(today))
+		upcomming, err := s.ListUpComming("123", today)
 
 		if err != nil {
 			log.Fatalln(err)
 			return
 		}
 
-		c.IndentedJSON(http.StatusCreated, gin.H{
-			"lastDay":   lastDayTime,
-			"upcomming": schedules,
-		})
+		c.IndentedJSON(http.StatusCreated, upcomming)
+	})
+
+	r.GET("/goal", func(c *gin.Context) {
+		if !isAuth(authToken, c) {
+			return
+		}
+
+		status := 2
+		goals, err := s.ListGoal("123", &status)
+
+		if err != nil {
+			return
+		}
+
+		c.IndentedJSON(http.StatusOK, goals)
 	})
 
 	r.POST("/automation/schedule", func(c *gin.Context) {

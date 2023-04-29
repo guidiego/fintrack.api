@@ -43,6 +43,8 @@ type Goal struct {
 	Name        string  `json:"name"`
 	Desired     float64 `json:"desired"`
 	Status      int     `json:"status"`
+	Allocated   float64 `json:"allocated"`
+	Used        float64 `json:"used"`
 }
 
 type ToScheduleFilterInput struct {
