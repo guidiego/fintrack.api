@@ -161,7 +161,7 @@ func (p *PostgresStorage) ListTransactions(accountID string) ([]ports.Transactio
 		INNER JOIN recipient as r ON r.id = t.recipient_id
 		WHERE t.account_id = $1
 		ORDER BY t.created_at DESC
-		LIMIT 10
+		LIMIT 25
 	`
 
 	res, err := p.cli.Query(q, accountID)
